@@ -12,32 +12,6 @@ obr = pd.read_parquet("s3://lfaivre/diffusion/aus1league_obraggregates_20242025.
 passing = pd.read_parquet("s3://lfaivre/diffusion/aus1league_passingaggregates_20242025.parquet", filesystem=fs)
 physical = pd.read_parquet("s3://lfaivre/diffusion/aus1league_physicalaggregates_20242025.parquet", filesystem=fs)
 
-# =====================================================================================
-# STATISTIQUES DESCRIPTIVES PAR ÉQUIPE : version n'utilisant que des éléments du cours
-# Résultat : DataFrame `stats_equipes` (1 ligne par équipe, colonnes aplaties "bloc__variable__stat")
-# =====================================================================================
-# LÉGENDE DES RÉFÉRENCES (page du cours + numéro de section dans le sommaire de la page)
-#   [INTRO §x]  = https://pythonds.linogaliana.fr/content/manipulation/02_pandas_intro.html
-#   [STATS §x]  = https://pythonds.linogaliana.fr/content/manipulation/02_pandas_stats.html
-#   [PY]        = Python de base (boucles, f-strings, fonctions, dictionnaires), non propre aux pages
-#   [HORS PAGES]= méthode réelle de pandas mais PAS présente sur les pages listées (à vérifier ou remplacer)
-# Les pages numpy, jointures, geopandas, regex, matplotlib et maps ne sont pas utilisées ici :
-# ce script ne contient ni graphique, ni carte, ni expression régulière, ni calcul numpy.
-# =====================================================================================
-
-import pandas as pd                          # [INTRO §1.2 Environnement]
-import s3fs                                  # [HORS PAGES] chargement Onyxia, inchangé
-
-# ------------------------------------------------------------------ CHARGEMENT (inchangé)
-fs = s3fs.S3FileSystem(                      # [HORS PAGES]
-    endpoint_url="https://minio.lab.sspcloud.fr",
-    client_kwargs={"region_name": "us-east-1"},
-)
-obr = pd.read_parquet("s3://lfaivre/diffusion/aus1league_obraggregates_20242025.parquet", filesystem=fs)
-passing = pd.read_parquet("s3://lfaivre/diffusion/aus1league_passingaggregates_20242025.parquet", filesystem=fs)
-physical = pd.read_parquet("s3://lfaivre/diffusion/aus1league_physicalaggregates_20242025.parquet", filesystem=fs)
-# (read_csv est présenté en [INTRO §4.2] ; read_parquet n'est pas dans les 8 pages listées)
-
 # ------------------------------------------------------------------ PARAMÈTRES
 MIN_MATCHES = 3                              # on ignore les joueurs ayant moins de N matchs
 ANNEE_REF = 2025 + 5 / 12                    # ≈ 31 mai 2025 (fin de saison), pour calculer l'âge
@@ -64,7 +38,7 @@ for df in [df_pas, df_obr]:
 df_pas["w_passes"] = df_pas["pass_count_attempted_total"]                             # % de passes : pondéré par les passes tentées
 df_obr["w_courses"] = df_obr["offballrun_count_total"]                                # distance des courses : pondérée par le nombre de courses
 
-# Âge approximatif (à environ un mois près) : on découpe la date "AAAA-MM-JJ" avec .str[:4] puis .astype(float)
+# Âge approximatif (date de référence fixée et arrondie au mois) : on découpe la date "AAAA-MM-JJ" avec .str[:4] puis .astype(float)
 # .str[:2] : [INTRO §6.1] ; .astype(...) : [INTRO §2.2 Avant le DataFrame, la Serie] et [STATS §1.1] .astype(int)
 annee = df_phys["player_birthdate"].str[:4].astype(float)
 mois = df_phys["player_birthdate"].str[5:7].astype(float)
@@ -78,8 +52,8 @@ def moyennes_ponderees(df, variables, poids, bloc):
     tmp = df.copy()                                           # [STATS §4.2]
     agregats = {}                                             # dictionnaire [PY]
     for var in variables:
-        present = 1 - tmp[var].isna()                         # isna : [INTRO §7.3 Valeurs manquantes] ; 1 si renseigné, 0 sinon
-        tmp[var + "_num"] = tmp[var].fillna(0) * tmp[poids] * present   # fillna : [INTRO §7.3]
+        present = 1 - tmp[var].isna().astype(int)             # [INTRO §7.3] isna ; [INTRO §2.2] astype : convertit les booléens en 0/1
+        tmp[var + "_num"] = tmp[var].fillna(0) * tmp[poids] * present   # [INTRO §7.3] fillna : valeurs absentes remplacées par zéro dans le numérateur
         tmp[var + "_den"] = tmp[poids] * present
         agregats[var + "_num"] = "sum"
         agregats[var + "_den"] = "sum"
@@ -111,7 +85,7 @@ def stat_par_equipe(df, variables, stat, bloc):
 
 def fusionner(liste_tableaux):
     """Assemble des tableaux indexés par équipe en un seul, avec une ligne par équipe."""
-    # reset_index : [STATS §2.2] ; merge(..., on=..., how="outer") : [STATS §1.1 Données] .merge(taux_pauvrete, on="CODGEO", how="outer")
+    # reset_index : [STATS §2.2] ; merge(..., on=..., how="outer") : [JOINTURES §4.4 Full join] et [STATS §1.1 Données]
     resultat = liste_tableaux[0].reset_index()
     for tableau in liste_tableaux[1:]:
         resultat = resultat.merge(tableau.reset_index(), on="equipe", how="outer")
@@ -236,5 +210,4 @@ print(stats_equipes.shape)
 print(stats_equipes.head(3))
 # .round() : [INTRO §7.2] ; ex. : stats_equipes.round(3)
 
-# to_csv : [HORS PAGES] méthode standard de pandas, non présente sur les 8 pages listées
 stats_equipes.to_csv("stats_equipes.csv", sep=";", decimal=",", encoding="utf-8-sig", index=False)
