@@ -29,12 +29,17 @@ for df in [phys, pas, courses]:
     )
 
 #on va calculer des poids pour calculer ensuite des moyennes pondérées. On va donner de l'importance au temps de jeu : un joueur qui joue beaucoup est plus représentatif que celui qui joue très peu (lorsque l'on a des données par 30 minutes)
+#Statistiques physiques : temps total de jeu
 phys['poids'] = phys['minutes_full_all'] * phys['count_match']
+#Statistiques physiques : temps en possession
+phys['poids_tip'] = phys['minutes_full_tip'] * phys['count_match']
+#Statistiques physiques : temps hors possession
+phys['poids_otip'] = phys['minutes_full_otip'] * phys['count_match']
+#Passes et courses : temps de possession
 pas['poids'] = pas['minutes_tip'] * pas['performance_count']
 courses['poids'] = courses['minutes_tip'] * courses['performance_count']
+#Qualité des passes : nombre de passes tentées
 pas['poids_passes'] = pas['pass_count_attempted_total']
-courses['poids_courses'] = courses['offballrun_count_total']
-
 
 #on définit une fonction pour calculer la moyenne pondérée pour nos différentes variables selon le data frame, les variables et les poids
 #moyenne pondérée = somme(variable * poids)/somme(poids)
@@ -79,11 +84,20 @@ variables_courses = [
     'offballrun_count_penaltyarea_p30tip',    #Courses dans la surface
     'offballrun_count_abovehsr_p30tip'        #Courses au-dessus du seuil HSR
 ]
+
+#Statistiques physiques : ensemble du temps de jeu
 variables_physiques = [
-    'total_metersperminute_full_all',         #Metres parcourus par minute
-    'total_metersperminute_full_tip',         #Metres/min en possession
-    'total_metersperminute_full_otip',        #Metres/min hors possession
-    'hsr_distance_full_all'                   #Distance a haute vitesse
+    'total_metersperminute_full_all',
+    'hsr_distance_full_all'
+]
+
+#Statistiques physiques : en possession du ballon
+variables_physiques_tip = [
+    'total_metersperminute_full_tip'
+]
+#Statistiques physiques : hors possession du ballon
+variables_physiques_otip = [
+    'total_metersperminute_full_otip'
 ]
 
 #calcul des moyennes pondérées par équipes
@@ -91,6 +105,8 @@ tab_passes = moyenne_ponderee_par_equipe(pas, variables_passes, 'poids')
 tab_qualite = moyenne_ponderee_par_equipe(pas, variables_qualite, 'poids_passes')
 tab_courses = moyenne_ponderee_par_equipe(courses, variables_courses, 'poids')
 tab_physique = moyenne_ponderee_par_equipe(phys, variables_physiques, 'poids')
+tab_physique_tip = moyenne_ponderee_par_equipe(phys, variables_physiques_tip, 'poids_tip')
+tab_physique_otip = moyenne_ponderee_par_equipe(phys, variables_physiques_otip, 'poids_otip')
 
 #Types de courses susceptibles d'eclairer le contournement de la zone 14
 variables_types = [
@@ -104,20 +120,16 @@ tab_types = moyenne_ponderee_par_equipe(courses, variables_types, 'poids')
 
 #on fusionne les tableaux de moyennes pondérées
 equipes = tab_passes.reset_index()
-for tableau in [tab_qualite, tab_courses, tab_physique, tab_types]:
+for tableau in [tab_qualite, tab_courses, tab_physique, tab_types, tab_physique_tip, tab_physique_otip]:
     equipes = equipes.merge(tableau.reset_index(), on='equipe', how='outer')
 
 #proportions de passes longues et passes cassant des lignes parmi les passes tentées; courses dangereuses, courses dans le dos de la défense, courses en solution courte parmi les courses
-equipes['part_passes_longues'] = (equipes['pass_count_longrange_attempted_p30tip'] /
-                                  equipes['pass_count_attempted_p30tip'])
-equipes['part_passes_lignes'] = (equipes['pass_count_linebreak_attempted_p30tip'] /
-                                 equipes['pass_count_attempted_p30tip'])
-equipes['part_courses_dangereuses'] = (equipes['offballrun_count_dangerous_p30tip'] /
-                                      equipes['offballrun_count_p30tip'])
-equipes['part_courses_dos_defense'] = (equipes['behindrun_count_p30tip'] /
-                                       equipes['offballrun_count_p30tip'])
-equipes['part_courses_courtes'] = (equipes['comingshortrun_count_p30tip'] /
-                                  equipes['offballrun_count_p30tip'])
+equipes['part_passes_longues'] = (equipes['pass_count_longrange_attempted_p30tip'] / equipes['pass_count_attempted_p30tip'])
+equipes['part_passes_lignes'] = (equipes['pass_count_linebreak_attempted_p30tip'] / equipes['pass_count_attempted_p30tip'])
+equipes['part_courses_dangereuses'] = (equipes['offballrun_count_dangerous_p30tip'] / equipes['offballrun_count_p30tip'])
+equipes['part_courses_dos_defense'] = (equipes['behindrun_count_p30tip'] / equipes['offballrun_count_p30tip'])
+equipes['part_courses_courtes'] = (equipes['comingshortrun_count_p30tip'] / equipes['offballrun_count_p30tip'])
+
 # %%
 #on affiche les stats descriptives sur les passes 
 print('\nTOUTES LES EQUIPES : LES PASSES ')
@@ -130,7 +142,7 @@ print(equipes[['equipe'] + variables_courses + variables_types + ['part_courses_
 # %%
 #on affiche les stats descriptives sur les données physiques
 print('\nTOUTES LES EQUIPES : INTENSITE PHYSIQUE')
-print(equipes[['equipe'] + variables_physiques])
+print(equipes[['equipe'] + variables_physiques + variables_physiques_tip + variables_physiques_otip ])
 
 # %%
 #on regarde la distribution entre équipes sur plusieurs stats 
@@ -145,6 +157,8 @@ print('\nDISPERSION DES PROFILS : PASSES')
 print(dispersion_profils(pas, variables_passes).round(2))
 print('\nDISPERSION DES PROFILS : COURSES')
 print(dispersion_profils(courses, variables_courses).round(2))
+print('\nDISPERSION DES TYPES DE COURSES')
+print(dispersion_profils(courses, variables_types).round(2))
 
 # %%
 #Focus sur Auckland
@@ -175,6 +189,9 @@ print('\nDISPERSION DES JOUEURS D\'AUCKLAND : PASSES')
 print(dispersion_profils(pas, variables_passes).loc['Auckland'].round(2))
 print('\nDISPERSION DES JOUEURS D\'AUCKLAND : COURSES')
 print(dispersion_profils(courses, variables_courses).loc['Auckland'].round(2))
+# Dispersion des types de courses des profils d'Auckland
+print('\nTYPES DE COURSES : AUCKLAND')
+print(dispersion_profils(courses, variables_types).loc['Auckland'].round(2))
 
 
 
