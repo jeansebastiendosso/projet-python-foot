@@ -40,6 +40,8 @@ pas['poids'] = pas['minutes_tip'] * pas['performance_count']
 courses['poids'] = courses['minutes_tip'] * courses['performance_count']
 #Qualité des passes : nombre de passes tentées
 pas['poids_passes'] = pas['pass_count_attempted_total']
+#Distance moyenne des courses : nombre de courses
+courses['poids_courses'] = courses['offballrun_count_total']
 
 #on définit une fonction pour calculer la moyenne pondérée pour nos différentes variables selon le data frame, les variables et les poids
 #moyenne pondérée = somme(variable * poids)/somme(poids)
@@ -65,6 +67,7 @@ variables_passes = [
     'pass_count_attempted_p30tip',            #Passes tentees
     'pass_count_completed_p30tip',            #Passes reussies
     'pass_count_linebreak_attempted_p30tip',  #Passes qui cassent une ligne
+    'pass_count_linebreak_completed_p30tip',  #Passes reussies qui cassent une ligne
     'pass_count_difficultpass_attempted_p30tip', #Passes difficiles
     'pass_count_longrange_attempted_p30tip',  #Passes longues
     'pass_count_dangerous_attempted_p30tip',  #Passes dangereuses
@@ -104,6 +107,8 @@ variables_physiques_otip = [
 tab_passes = moyenne_ponderee_par_equipe(pas, variables_passes, 'poids')
 tab_qualite = moyenne_ponderee_par_equipe(pas, variables_qualite, 'poids_passes')
 tab_courses = moyenne_ponderee_par_equipe(courses, variables_courses, 'poids')
+#Distance moyenne des courses sans ballon
+tab_distance_courses = moyenne_ponderee_par_equipe(courses, ['offballrun_avgdistance'], 'poids_courses')
 tab_physique = moyenne_ponderee_par_equipe(phys, variables_physiques, 'poids')
 tab_physique_tip = moyenne_ponderee_par_equipe(phys, variables_physiques_tip, 'poids_tip')
 tab_physique_otip = moyenne_ponderee_par_equipe(phys, variables_physiques_otip, 'poids_otip')
@@ -120,12 +125,16 @@ tab_types = moyenne_ponderee_par_equipe(courses, variables_types, 'poids')
 
 #on fusionne les tableaux de moyennes pondérées
 equipes = tab_passes.reset_index()
-for tableau in [tab_qualite, tab_courses, tab_physique, tab_types, tab_physique_tip, tab_physique_otip]:
+for tableau in [tab_qualite, tab_courses, tab_physique, tab_types, tab_physique_tip, tab_physique_otip, tab_distance_courses]:
     equipes = equipes.merge(tableau.reset_index(), on='equipe', how='outer')
 
 #proportions de passes longues et passes cassant des lignes parmi les passes tentées; courses dangereuses, courses dans le dos de la défense, courses en solution courte parmi les courses
 equipes['part_passes_longues'] = (equipes['pass_count_longrange_attempted_p30tip'] / equipes['pass_count_attempted_p30tip'])
 equipes['part_passes_lignes'] = (equipes['pass_count_linebreak_attempted_p30tip'] / equipes['pass_count_attempted_p30tip'])
+#proportion de passes cassant les lignes qui sont réussies
+equipes['reussite_passes_lignes'] = (equipes['pass_count_linebreak_completed_p30tip'] / equipes['pass_count_linebreak_attempted_p30tip'])
+#proportion de passes difficiles parmi les passes tentées
+equipes['part_passes_difficiles'] = (equipes['pass_count_difficultpass_attempted_p30tip'] / equipes['pass_count_attempted_p30tip'])
 equipes['part_courses_dangereuses'] = (equipes['offballrun_count_dangerous_p30tip'] / equipes['offballrun_count_p30tip'])
 equipes['part_courses_dos_defense'] = (equipes['behindrun_count_p30tip'] / equipes['offballrun_count_p30tip'])
 equipes['part_courses_courtes'] = (equipes['comingshortrun_count_p30tip'] / equipes['offballrun_count_p30tip'])
@@ -133,11 +142,11 @@ equipes['part_courses_courtes'] = (equipes['comingshortrun_count_p30tip'] / equi
 # %%
 #on affiche les stats descriptives sur les passes 
 print('\nTOUTES LES EQUIPES : LES PASSES ')
-print(equipes[['equipe'] + variables_passes + variables_qualite + ['part_passes_longues', 'part_passes_lignes']])
+print(equipes[['equipe'] + variables_passes + variables_qualite + ['part_passes_longues', 'part_passes_lignes', 'reussite_passes_lignes', 'part_passes_difficiles']])
 # %%
 #on affiche les stats descriptives sur les courses
 print('\nTOUTES LES EQUIPES : COURSES SANS BALLON')
-print(equipes[['equipe'] + variables_courses + variables_types + ['part_courses_dangereuses', 'part_courses_dos_defense', 'part_courses_courtes']])
+print(equipes[['equipe'] + variables_courses + variables_types + ['part_courses_dangereuses', 'part_courses_dos_defense', 'part_courses_courtes', 'offballrun_avgdistance']])
 
 # %%
 #on affiche les stats descriptives sur les données physiques
@@ -147,7 +156,7 @@ print(equipes[['equipe'] + variables_physiques + variables_physiques_tip + varia
 # %%
 #on regarde la distribution entre équipes sur plusieurs stats 
 print('\nDISTRIBUTION ENTRE EQUIPES')
-variables_clefs = ['pass_count_attempted_p30tip', 'pass_count_linebreak_attempted_p30tip', 'pass_count_difficultpass_attempted_p30tip', 'pass_avgdistance', 'offballrun_count_p30tip', 'offballrun_count_dangerous_p30tip', 'part_passes_longues', 'part_courses_dos_defense']
+variables_clefs = ['pass_count_attempted_p30tip', 'pass_count_linebreak_attempted_p30tip', 'pass_count_difficultpass_attempted_p30tip', 'pass_avgdistance', 'offballrun_count_p30tip', 'offballrun_count_dangerous_p30tip', 'part_passes_longues', 'part_courses_dos_defense', 'reussite_passes_lignes', 'part_passes_difficiles', 'offballrun_avgdistance']
 resume_ligue = equipes[variables_clefs].agg(['mean', 'median', 'std', 'min', 'max'])
 print(resume_ligue.round(2))
 
@@ -157,6 +166,8 @@ print('\nDISPERSION DES PROFILS : PASSES')
 print(dispersion_profils(pas, variables_passes).round(2))
 print('\nDISPERSION DES PROFILS : COURSES')
 print(dispersion_profils(courses, variables_courses).round(2))
+#dispersion de la distance moyenne des courses
+print(dispersion_profils(courses, ['offballrun_avgdistance']).round(2))
 print('\nDISPERSION DES TYPES DE COURSES')
 print(dispersion_profils(courses, variables_types).round(2))
 
@@ -189,6 +200,8 @@ print('\nDISPERSION DES JOUEURS D\'AUCKLAND : PASSES')
 print(dispersion_profils(pas, variables_passes).loc['Auckland'].round(2))
 print('\nDISPERSION DES JOUEURS D\'AUCKLAND : COURSES')
 print(dispersion_profils(courses, variables_courses).loc['Auckland'].round(2))
+#distance moyenne des courses des profils d'Auckland
+print(dispersion_profils(courses, ['offballrun_avgdistance']).loc['Auckland'].round(2))
 # Dispersion des types de courses des profils d'Auckland
 print('\nTYPES DE COURSES : AUCKLAND')
 print(dispersion_profils(courses, variables_types).loc['Auckland'].round(2))
@@ -245,6 +258,23 @@ plt.title('Relation entre passes et courses sans ballon')
 plt.legend()
 plt.show()
 
-
+# %%
+#Graphique 6 : proportion de passes longues sur les 13 équipes
+classement = equipes.sort_values('part_passes_longues')
+plt.figure(figsize=(10, 6))
+plt.barh(classement['equipe'], classement['part_passes_longues'])
+plt.xlabel('Proportion de passes longues parmi les passes tentees')
+plt.title('Part des passes longues - 13 equipes')
+plt.show()
 
 # %%
+#Graphique 7 : proportion de courses dans le dos de la defense sur les 13 équipes
+classement = equipes.sort_values('part_courses_dos_defense')
+plt.figure(figsize=(10, 6))
+plt.barh(classement['equipe'], classement['part_courses_dos_defense'])
+plt.xlabel('Proportion de courses dans le dos de la defense')
+plt.title('Part des courses dans le dos de la defense - 13 equipes')
+plt.show()
+
+# %%
+
