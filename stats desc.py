@@ -4,7 +4,6 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Preferred: create the shared AWS profile once, then reuse it here.
 fs = s3fs.S3FileSystem(
     endpoint_url="https://minio.lab.sspcloud.fr",
     client_kwargs={"region_name": "us-east-1"},

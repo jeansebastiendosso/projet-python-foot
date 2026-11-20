@@ -1,5 +1,28 @@
+import s3fs
 import pandas as pd
+import json
 import matplotlib.pyplot as plt
+
+fs = s3fs.S3FileSystem(
+    endpoint_url="https://minio.lab.sspcloud.fr",
+    client_kwargs={"region_name": "us-east-1"},
+)
+#1886347 correspond au match Auckland vs Newcastle jets
+events_1886347 = pd.read_parquet("s3://lfaivre/diffusion/1886347_dynamic_events.parquet", filesystem=fs)
+with fs.open("s3://lfaivre/diffusion/1886347_match.json", "r") as fichier:
+    match_1886347 = json.load(fichier)
+
+events_1899585 = pd.read_parquet("s3://lfaivre/diffusion/1899585_dynamic_events.parquet", filesystem=fs)
+with fs.open("s3://lfaivre/diffusion/1899585_match.json", "r") as fichier:
+    match_1899585 = json.load(fichier)
+
+events_2015213 = pd.read_parquet("s3://lfaivre/diffusion/2015213_dynamic_events.parquet", filesystem=fs)
+with fs.open("s3://lfaivre/diffusion/2015213_match.json", "r") as fichier:
+    match_2015213 = json.load(fichier)
+
+events_2017461 = pd.read_parquet("s3://lfaivre/diffusion/2017461_dynamic_events.parquet", filesystem=fs)
+with fs.open("s3://lfaivre/diffusion/2017461_match.json", "r") as fichier:
+    match_2017461 = json.load(fichier)
 
 
 # %%
